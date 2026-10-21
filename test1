@@ -1,0 +1,52 @@
+
+Sub Copy_Data_From_Selected_File()
+
+    Dim filePath As Variant
+    Dim wb As Workbook
+    Dim ws As Worksheet
+
+    ' 파일 선택 창 열기
+    filePath = Application.GetOpenFilename( _
+        FileFilter:="Excel 파일 (*.xlsx; *.xlsm; *.xls),*.xlsx;*.xlsm;*.xls", _
+        Title:="데이터를 수정할 엑셀 파일을 선택하세요")
+
+    ' 취소한 경우 종료
+    If filePath = False Then Exit Sub
+
+    Application.ScreenUpdating = False
+
+    On Error GoTo ErrorHandler
+
+    ' 선택한 엑셀 파일 열기
+    Set wb = Workbooks.Open(CStr(filePath))
+
+    ' 선택한 파일의 모든 시트 처리
+    For Each ws In wb.Worksheets
+
+        ' S33:S104의 값을 Q33:Q104에 덮어쓰기
+        ws.Range("Q33:Q104").Value = ws.Range("S33:S104").Value
+
+    Next ws
+
+    ' 변경 내용 저장 및 파일 닫기
+    wb.Save
+    wb.Close SaveChanges:=False
+
+    Application.ScreenUpdating = True
+
+    MsgBox "데이터 덮어쓰기가 완료되었습니다.", vbInformation
+    Exit Sub
+
+ErrorHandler:
+
+    Application.ScreenUpdating = True
+
+    If Not wb Is Nothing Then
+        If wb Is Application.ActiveWorkbook Then
+            ' 별도 처리 없음
+        End If
+    End If
+
+    MsgBox "오류가 발생했습니다: " & Err.Description, vbExclamation
+
+End Sub
