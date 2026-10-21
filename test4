@@ -1,0 +1,69 @@
+
+
+    ' 속도 최적화
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    ' B 엑셀 열기
+    Set wbB = Workbooks.Open(Filename:=CStr(filePath))
+
+    ' B 엑셀의 모든 시트명을 Dictionary에 등록
+    Set sheetDict = CreateObject("Scripting.Dictionary")
+    sheetDict.CompareMode = vbTextCompare
+
+    For Each wsB In wbB.Worksheets
+        If Not sheetDict.Exists(wsB.Name) Then
+            sheetDict.Add wsB.Name, wsB
+        End If
+    Next wsB
+
+    ' A 엑셀의 8번째 시트부터 마지막 시트까지 확인
+    For i = 8 To wbA.Worksheets.Count
+
+        Set wsA = wbA.Worksheets(i)
+
+        If sheetDict.Exists(wsA.Name) Then
+
+            Set wsB = sheetDict(wsA.Name)
+
+            ' B의 P33:P104 -> A의 R33:R104
+            ' B의 Q33:Q104 -> A의 S33:S104
+            wsA.Range("R33:S104").Value2 = _
+                wsB.Range("P33:Q104").Value2
+
+            copiedCount = copiedCount + 1
+
+        Else
+
+            ' 일치하는 시트가 없으면 건너뛰기
+            skippedCount = skippedCount + 1
+
+        End If
+
+    Next i
+
+CleanExit:
+
+    Application.ScreenUpdating = oldScreen
+    Application.EnableEvents = oldEvents
+    Application.Calculation = oldCalc
+
+    MsgBox "작업 종료!" & vbCrLf & _
+           "복사한 시트: " & copiedCount & "개" & vbCrLf & _
+           "건너뛴 시트: " & skippedCount & "개", _
+           vbInformation, "결과 확인"
+
+    Exit Sub
+
+ErrorHandler:
+
+    Application.ScreenUpdating = oldScreen
+    Application.EnableEvents = oldEvents
+    Application.Calculation = oldCalc
+
+    MsgBox "오류 번호: " & Err.Number & vbCrLf & _
+           "오류 내용: " & Err.Description, _
+           vbExclamation, "매크로 오류"
+
+End Sub
