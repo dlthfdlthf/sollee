@@ -1,4 +1,38 @@
 
+Sub Import_Data_Fast()
+
+    Dim wbA As Workbook
+    Dim wbB As Workbook
+    Dim wsA As Worksheet
+    Dim wsB As Worksheet
+    Dim filePath As Variant
+    Dim sheetDict As Object
+    Dim i As Long
+    Dim copiedCount As Long
+    Dim skippedCount As Long
+
+    Dim oldScreen As Boolean
+    Dim oldEvents As Boolean
+    Dim oldCalc As XlCalculation
+
+    ' A 엑셀: 매크로 버튼이 있는 파일
+    Set wbA = ThisWorkbook
+
+    ' B 엑셀 파일 선택
+    filePath = Application.GetOpenFilename( _
+        FileFilter:="Excel 파일 (*.xlsx;*.xlsm;*.xls),*.xlsx;*.xlsm;*.xls", _
+        Title:="데이터를 가져올 B 엑셀 파일을 선택하세요")
+
+    If VarType(filePath) = vbBoolean Then
+        If filePath = False Then Exit Sub
+    End If
+
+    ' 기존 엑셀 설정 저장
+    oldScreen = Application.ScreenUpdating
+    oldEvents = Application.EnableEvents
+    oldCalc = Application.Calculation
+
+    On Error GoTo ErrorHandler
 
     ' 속도 최적화
     Application.ScreenUpdating = False
