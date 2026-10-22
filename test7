@@ -1,0 +1,144 @@
+
+Option Explicit
+
+Sub Import_Data_UltraFast()
+
+    Dim wbA As Workbook, wbB As Workbook
+    Dim wsA As Worksheet, wsB As Worksheet
+    Dim wsControl As Worksheet
+    Dim sheetDict As Object
+    Dim filePath As Variant
+    Dim i As Long
+    Dim copiedCount As Long, skippedCount As Long
+    Dim useRS As Boolean
+    Dim oldScreen As Boolean
+    Dim oldEvents As Boolean
+    Dim oldCalc As XlCalculation
+    Dim oldAlerts As Boolean
+    Dim errMsg As String
+
+    ' A 엑셀: 매크로 버튼이 있는 파일
+    Set wbA = ThisWorkbook
+    Set wsControl = ActiveSheet
+
+    ' L2 체크박스 상태 확인
+    useRS = (wsControl.Range("L2").Value = True)
+
+    ' B 엑셀 파일 선택
+    filePath = Application.GetOpenFilename( _
+        "Excel 파일 (*.xlsx;*.xlsm;*.xls),*.xlsx;*.xlsm;*.xls", _
+        , "데이터를 가져올 B 엑셀 파일 선택")
+
+    If VarType(filePath) = vbBoolean Then
+        If filePath = False Then Exit Sub
+    End If
+
+    ' 기존 설정 저장
+    oldScreen = Application.ScreenUpdating
+    oldEvents = Application.EnableEvents
+    oldCalc = Application.Calculation
+    oldAlerts = Application.DisplayAlerts
+
+    On Error GoTo ErrorHandler
+
+    ' 속도 최적화
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+    Application.DisplayAlerts = False
+    Application.StatusBar = "B 엑셀 파일을 여는 중..."
+
+    ' B 엑셀 열기 (읽기 전용)
+    Set wbB = Workbooks.Open( _
+        Filename:=CStr(filePath), _
+        UpdateLinks:=0, _
+        ReadOnly:=True, _
+        AddToMru:=False)
+
+    ' B 엑셀의 보이는 시트명만 Dictionary에 등록
+    Application.StatusBar = "시트명 색인 생성 중..."
+
+    Set sheetDict = CreateObject("Scripting.Dictionary")
+    sheetDict.CompareMode = vbTextCompare
+
+    For Each wsB In wbB.Worksheets
+
+        If wsB.Visible = xlSheetVisible Then
+            If Not sheetDict.Exists(wsB.Name) Then
+                sheetDict.Add wsB.Name, wsB.Index
+            End If
+        End If
+
+    Next wsB
+
+    ' A 엑셀의 7번째 시트부터 마지막 시트까지 처리
+    For i = 7 To wbA.Worksheets.Count
+
+        Set wsA = wbA.Worksheets(i)
+
+        ' A 엑셀의 숨겨진 시트는 건너뛰기
+        If wsA.Visible = xlSheetVisible Then
+
+            If sheetDict.Exists(wsA.Name) Then
+
+                Set wsB = wbB.Worksheets( _
+                    CLng(sheetDict(wsA.Name)))
+
+                If useRS Then
+                    ' 체크됨: B의 R33:S104 -> A의 R33:S104
+                    wsA.Range("R33:S104").Value2 = _
+                        wsB.Range("R33:S104").Value2
+                Else
+                    ' 체크 안 됨: B의 P33:Q104 -> A의 R33:S104
+                    wsA.Range("R33:S104").Value2 = _
+                        wsB.Range("P33:Q104").Value2
+                End If
+
+                copiedCount = copiedCount + 1
+
+            Else
+
+                ' B에 같은 이름의 보이는 시트가 없으면 건너뛰기
+                skippedCount = skippedCount + 1
+
+            End If
+
+        End If
+
+    Next i
+
+    GoTo CleanExit
+
+ErrorHandler:
+
+    errMsg = "오류 번호: " & Err.Number & vbCrLf & _
+             "내용: " & Err.Description
+
+CleanExit:
+
+    ' 기존 엑셀 설정 복구
+    Application.ScreenUpdating = oldScreen
+    Application.EnableEvents = oldEvents
+    Application.Calculation = oldCalc
+    Application.DisplayAlerts = oldAlerts
+    Application.StatusBar = False
+
+    If Len(errMsg) > 0 Then
+
+        MsgBox errMsg, vbExclamation, "매크로 오류"
+
+    Else
+
+        MsgBox "작업 완료!" & vbCrLf & vbCrLf & _
+               "복사 방식: " & IIf(useRS, _
+                   "B의 R:S → A의 R:S", _
+                   "B의 P:Q → A의 R:S") & vbCrLf & _
+               "복사한 시트: " & copiedCount & "개" & vbCrLf & _
+               "건너뛴 시트: " & skippedCount & "개" & vbCrLf & vbCrLf & _
+               "숨겨진 시트는 처리하지 않았습니다." & vbCrLf & _
+               "파일은 자동 저장하거나 닫지 않았습니다.", _
+               vbInformation, "작업 완료")
+
+    End If
+
+End Sub
