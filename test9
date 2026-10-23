@@ -1,0 +1,173 @@
+
+Option Explicit
+
+Sub FastMatchAndUpdatePQ()
+
+    Dim wbA As Workbook, wbB As Workbook
+    Dim wsA As Worksheet, wsB As Worksheet
+    Dim filePath As Variant
+    Dim dict As Object
+    Dim arrA As Variant, arrB As Variant, arrPQ As Variant
+    Dim sheetIndex As Long
+    Dim i As Long, j As Long
+    Dim key As String
+    Dim matchedCount As Long
+    Dim processedSheets As Long
+
+    Dim oldCalc As XlCalculation
+    Dim oldScreen As Boolean
+    Dim oldEvents As Boolean
+    Dim oldStatusBar As Variant
+
+    ' 버튼이 있는 A 엑셀
+    Set wbA = ThisWorkbook
+
+    ' B 엑셀 파일 선택 창
+    filePath = Application.GetOpenFilename( _
+        FileFilter:="Excel Files (*.xlsx;*.xlsm;*.xls),*.xlsx;*.xlsm;*.xls", _
+        Title:="비교할 B 엑셀 파일을 선택하세요")
+
+    ' 취소한 경우 종료
+    If VarType(filePath) = vbBoolean Then Exit Sub
+
+    ' 엑셀 설정 저장
+    oldCalc = Application.Calculation
+    oldScreen = Application.ScreenUpdating
+    oldEvents = Application.EnableEvents
+    oldStatusBar = Application.StatusBar
+
+    On Error GoTo ErrorHandler
+
+    ' 속도 최적화
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    ' B 엑셀 열기
+    Set wbB = Workbooks.Open( _
+        Filename:=CStr(filePath), _
+        UpdateLinks:=0, _
+        ReadOnly:=True)
+
+    Set dict = CreateObject("Scripting.Dictionary")
+    dict.CompareMode = vbBinaryCompare
+
+    ' A 엑셀의 7번째 시트부터 처리
+    For sheetIndex = 7 To wbA.Worksheets.Count
+
+        Set wsA = wbA.Worksheets(sheetIndex)
+        Set wsB = Nothing
+
+        ' B 엑셀에서 동일한 시트명 검색
+        On Error Resume Next
+        Set wsB = wbB.Worksheets(wsA.Name)
+        On Error GoTo ErrorHandler
+
+        If Not wsB Is Nothing Then
+
+            Application.StatusBar = _
+                "처리 중: " & wsA.Name & _
+                " (" & sheetIndex & "/" & _
+                wbA.Worksheets.Count & ")"
+
+            dict.RemoveAll
+
+            ' B 엑셀의 검색 범위와 가져올 데이터
+            arrB = wsB.Range("B34:B60").Value2
+            arrPQ = wsB.Range("P34:Q60").Value2
+
+            ' B열 값을 Dictionary에 저장
+            For j = 1 To UBound(arrB, 1)
+
+                If Not IsError(arrB(j, 1)) Then
+
+                    key = Trim$(CStr(arrB(j, 1)))
+
+                    If Len(key) > 0 Then
+                        ' 중복값은 첫 번째 일치 행 사용
+                        If Not dict.Exists(key) Then
+                            dict.Add key, j
+                        End If
+                    End If
+
+                End If
+
+            Next j
+
+            ' A 엑셀의 B34:B64 검색
+            arrA = wsA.Range("B34:B64").Value2
+
+            For i = 1 To UBound(arrA, 1)
+
+                If Not IsError(arrA(i, 1)) Then
+
+                    key = Trim$(CStr(arrA(i, 1)))
+
+                    If Len(key) > 0 Then
+
+                        If dict.Exists(key) Then
+
+                            j = dict(key)
+
+                            ' B 엑셀의 일치 행 P, Q 값을
+                            ' A 엑셀의 해당 행 P, Q에 덮어쓰기
+                            wsA.Cells(i + 33, "P").Value2 = _
+                                arrPQ(j, 1)
+
+                            wsA.Cells(i + 33, "Q").Value2 = _
+                                arrPQ(j, 2)
+
+                            matchedCount = matchedCount + 1
+
+                        End If
+
+                    End If
+
+                End If
+
+            Next i
+
+            processedSheets = processedSheets + 1
+
+        End If
+
+    Next sheetIndex
+
+    ' B 엑셀 닫기
+    wbB.Close SaveChanges:=False
+    Set wbB = Nothing
+
+    ' 엑셀 설정 복원
+    Application.Calculation = oldCalc
+    Application.ScreenUpdating = oldScreen
+    Application.EnableEvents = oldEvents
+    Application.StatusBar = oldStatusBar
+
+    MsgBox "작업 완료!" & vbCrLf & vbCrLf & _
+           "처리한 시트 수: " & processedSheets & vbCrLf & _
+           "일치한 항목 수: " & matchedCount & vbCrLf & vbCrLf & _
+           "결과를 확인한 후 A 엑셀을 저장하세요.", _
+           vbInformation, "데이터 비교 완료"
+
+    Exit Sub
+
+ErrorHandler:
+
+    Dim errorMessage As String
+    errorMessage = Err.Description
+
+    On Error Resume Next
+
+    If Not wbB Is Nothing Then
+        wbB.Close SaveChanges:=False
+    End If
+
+    Application.Calculation = oldCalc
+    Application.ScreenUpdating = oldScreen
+    Application.EnableEvents = oldEvents
+    Application.StatusBar = oldStatusBar
+
+    MsgBox "오류가 발생했습니다." & vbCrLf & _
+           errorMessage, vbExclamation, "작업 오류"
+
+End Sub
